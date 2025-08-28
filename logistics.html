@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>P.O.P.S. Logistics Demo</title>
+    <style>
+        :root {
+            --bg-color: #0A0F1A;
+            --panel-color: #0E1526;
+            --border-color: #1F2947;
+            --accent-color: #6CF5FF;
+            --text-color: #E7EBFF;
+            --muted-text: #9DA9D9;
+            --green: #67ffa1;
+            --red: #ff7e9e;
+            --yellow: #ffd36c;
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 1rem;
+            gap: 1rem;
+            background: radial-gradient(circle at 50% 120%, rgba(20, 25, 40, 0.6) 0%, rgba(10, 15, 26, 0.9) 50%, var(--bg-color) 100%);
+        }
+        .header {
+            text-align: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header h1 {
+            font-size: clamp(1.5rem, 3vw, 2.5rem);
+            color: var(--accent-color);
+            margin: 0;
+        }
+        .header p {
+            color: var(--muted-text);
+            font-size: 0.9rem;
+        }
+        .split-view {
+            flex-grow: 1;
+            display: flex;
+            gap: 1rem;
+            overflow: hidden;
+        }
+        .panel {
+            flex: 1;
+            background: var(--panel-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .panel-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-header h2 {
+            font-size: 1.2rem;
+            margin: 0;
+        }
+        .network-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .network-online { background-color: var(--green); }
+        .network-offline { background-color: var(--red); }
+        .network-syncing { background-color: var(--yellow); }
+        .content {
+            flex-grow: 1;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        .job-list {
+            list-style: none;
+            padding: 0;
+        }
+        .job-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            transition: all 0.2s ease-in-out;
+        }
+        .job-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        .job-item h3 {
+            font-size: 1.1rem;
+            margin: 0 0 0.25rem;
+        }
+        .job-item p {
+            font-size: 0.9rem;
+            color: var(--muted-text);
+            margin: 0;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+        .status-in-progress { background-color: rgba(255, 211, 108, 0.15); color: var(--yellow); }
+        .status-completed { background-color: rgba(103, 255, 161, 0.15); color: var(--green); }
+        .status-synced { background-color: rgba(108, 245, 255, 0.15); color: var(--accent-color); }
+        .log-panel {
+            background: var(--panel-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            color: var(--muted-text);
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            padding-top: 1rem;
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: linear-gradient(180deg, #0f1a33, #0a1226);
+            color: var(--text-color);
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+        .btn:disabled {
+            background: #283149;
+            color: #555;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>P.O.P.S. Logistics Protocol Demo</h1>
+        <p>A simple one-page simulation of the offline-first workflow for field service and logistics.</p>
+    </div>
+
+    <div class="split-view">
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Field Device</h2>
+                <div id="field-network-status" class="network-status network-online"></div>
+            </div>
+            <div id="field-device-content" class="content">
+                <ul id="field-job-list" class="job-list"></ul>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <h2>Central Command</h2>
+                <div id="central-network-status" class="network-status network-online"></div>
+            </div>
+            <div id="central-command-content" class="content">
+                <ul id="central-job-list" class="job-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="go-offline-btn" class="btn">Go Offline</button>
+        <button id="complete-task-btn" class="btn" disabled>Complete Task</button>
+        <button id="go-online-btn" class="btn" disabled>Go Online</button>
+        <button id="reset-btn" class="btn">Reset</button>
+    </div>
+
+    <div id="log-panel" class="log-panel">
+        <p>[00:00:00] **System Initialized:** P.O.P.S. core protocol ready.</p>
+        <p>[00:00:00] **Daily Briefing:** Simulating sync of today's work orders.</p>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // DOM elements
+        const fieldNetworkStatus = document.getElementById('field-network-status');
+        const centralNetworkStatus = document.getElementById('central-network-status');
+        const fieldJobList = document.getElementById('field-job-list');
+        const centralJobList = document.getElementById('central-job-list');
+        const logPanel = document.getElementById('log-panel');
+        const goOfflineBtn = document.getElementById('go-offline-btn');
+        const completeTaskBtn = document.getElementById('complete-task-btn');
+        const goOnlineBtn = document.getElementById('go-online-btn');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // State variables
+        let isOnline = true;
+        let isTaskCompleted = false;
+        let jobData = [];
+        let centralJobData = [];
+
+        function log(message, color = 'var(--text-color)') {
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const p = document.createElement('p');
+            p.innerHTML = `<span style="color:${color}">[${time}]</span> ${message}`;
+            logPanel.appendChild(p);
+            logPanel.scrollTop = logPanel.scrollHeight;
+        }
+
+        function renderJobs() {
+            // Render on Field Device
+            fieldJobList.innerHTML = jobData.map(job => `
+                <li class="job-item">
+                    <h3>Job #${job.id}: ${job.title}</h3>
+                    <p>Location: ${job.location}</p>
+                    <p>Status: <span class="status-badge status-${job.status.toLowerCase().replace(/ /g, '-')}">${job.status}</span></p>
+                </li>
+            `).join('');
+
+            // Render on Central Command
+            centralJobList.innerHTML = centralJobData.map(job => `
+                <li class="job-item">
+                    <h3>Job #${job.id}: ${job.title}</h3>
+                    <p>Status: <span class="status-badge status-${job.status.toLowerCase().replace(/ /g, '-')}">${job.status}</span></p>
+                </li>
+            `).join('');
+        }
+
+        function updateNetworkStatus() {
+            fieldNetworkStatus.classList.toggle('network-online', isOnline);
+            fieldNetworkStatus.classList.toggle('network-offline', !isOnline);
+            centralNetworkStatus.classList.toggle('network-online', isOnline);
+            centralNetworkStatus.classList.toggle('network-offline', !isOnline);
+        }
+
+        function syncData() {
+            if (!isOnline) {
+                log('Cannot sync: No network connection.', 'var(--red)');
+                return;
+            }
+            
+            log('**P.O.P.S. Protocol: Initiating Delta Sync...**');
+            
+            // Animate sync status
+            fieldNetworkStatus.classList.add('network-syncing');
+            centralNetworkStatus.classList.add('network-syncing');
+
+            // Simulate sync delay
+            setTimeout(() => {
+                // Find and update unsynced jobs
+                let syncedCount = 0;
+                jobData.forEach(localJob => {
+                    const centralJob = centralJobData.find(j => j.id === localJob.id);
+                    if (centralJob && centralJob.status !== localJob.status) {
+                        centralJob.status = localJob.status;
+                        syncedCount++;
+                    }
+                });
+
+                if (syncedCount > 0) {
+                    log(`**Trace Receipt:** ${syncedCount} tasks synced to Central Command.`, 'var(--green)');
+                } else {
+                    log('No new tasks to sync. System is up to date.');
+                }
+                
+                // Animate completion
+                fieldNetworkStatus.classList.remove('network-syncing');
+                centralNetworkStatus.classList.remove('network-syncing');
+                updateNetworkStatus();
+                renderJobs();
+            }, 1500);
+        }
+
+        function resetDemo() {
+            isOnline = true;
+            isTaskCompleted = false;
+            jobData = [
+                { id: 101, title: 'Inspect HVAC Unit', location: 'Unit 4A, Bldg B', status: 'In Progress' },
+                { id: 102, title: 'Replace Water Filter', location: 'Unit 2C, Bldg A', status: 'In Progress' }
+            ];
+            centralJobData = [
+                { id: 101, title: 'Inspect HVAC Unit', status: 'In Progress' },
+                { id: 102, title: 'Replace Water Filter', status: 'In Progress' }
+            ];
+
+            goOfflineBtn.disabled = false;
+            completeTaskBtn.disabled = true;
+            goOnlineBtn.disabled = true;
+
+            logPanel.innerHTML = '<p>[00:00:00] **System Initialized:** P.O.P.S. core protocol ready.</p><p>[00:00:00] **Daily Briefing:** Simulating sync of today\'s work orders.</p>';
+            
+            updateNetworkStatus();
+            renderJobs();
+        }
+
+        // Event Listeners
+        goOfflineBtn.addEventListener('click', () => {
+            isOnline = false;
+            updateNetworkStatus();
+            log('**Go Offline:** Network connection lost. **P.O.P.S. resilience** activated.', 'var(--yellow)');
+            goOfflineBtn.disabled = true;
+            completeTaskBtn.disabled = false;
+            goOnlineBtn.disabled = false;
+        });
+
+        completeTaskBtn.addEventListener('click', () => {
+            if (isTaskCompleted) {
+                log('No more tasks to complete. Please reset.', 'var(--red)');
+                return;
+            }
+            // Simulate completing a task locally
+            jobData[0].status = 'Completed';
+            isTaskCompleted = true;
+            renderJobs();
+            log('**Task Complete:** "Job #101" finished. Data saved to local cache.', 'var(--green)');
+            log('**Trace Receipt:** "Local Save Confirmed"', 'var(--green)');
+            completeTaskBtn.disabled = true;
+        });
+
+        goOnlineBtn.addEventListener('click', () => {
+            isOnline = true;
+            updateNetworkStatus();
+            log('**Back Online:** Network connection re-established.', 'var(--green)');
+            goOnlineBtn.disabled = true;
+            goOfflineBtn.disabled = false;
+            // Trigger automatic sync on connection
+            syncData();
+        });
+
+        resetBtn.addEventListener('click', resetDemo);
+
+        // Initial setup
+        resetDemo();
+    });
+</script>
+</body>
+</html>
