@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>P.O.P.S. Media Mall — Split‑Screen Protocol AppDrop</title>
+<meta name="description" content="One‑page offline AppDrop: pick local media, play side‑by‑side, and watch the P.O.P.S. protocol flow animate (User→Roger→Cache→Engine→Panel→State→Online). Includes Tutor Mode and a Mall picker."/>
+<style>
+  :root{
+    --bg:#0a0f1a; --panel:#0e1526; --ink:#e7ebff; --muted:#9da9d9; --edge:#1f2947; --glass:rgba(255,255,255,.06);
+    --accent:#6cf5ff; --accent2:#c28bff; --good:#67ffa1; --warn:#ffd36c; --danger:#ff7e9e;
+    --l:#67ffa1; --r:#6cf5ff; --both:#c28bff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(1200px 680px at 20% -10%, #0f1629, var(--bg));color:var(--ink);font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif}
+  .hud{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;padding:.6rem .8rem;background:linear-gradient(180deg,rgba(15,22,41,.88),rgba(15,22,41,.55));backdrop-filter:saturate(1.2) blur(8px);border-bottom:1px solid var(--edge);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .hud h1{margin:0;font-size:1rem;color:var(--accent)}
+  .pill{display:flex;align-items:center;gap:.5rem;background:var(--glass);border:1px solid var(--edge);padding:.45rem .6rem;border-radius:999px}
+  .pill label{font-size:.8rem;color:var(--muted)}
+  .hud select,.hud input[type="checkbox"],.hud input[type="range"]{accent-color:var(--accent)}
+  .hud button{border:1px solid var(--edge);background:linear-gradient(180deg,#0f1a33,#0a1226);color:var(--ink);padding:.5rem .7rem;border-radius:12px;cursor:pointer}
+  .hud button:hover{box-shadow:0 0 0 1px var(--accent),0 0 18px rgba(108,245,255,.22)}
+
+  .grid{display:grid;grid-template-columns: 1fr 1fr 420px;gap:.75rem;padding:.75rem}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.025));border:1px solid var(--edge);border-radius:16px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03), 0 10px 30px rgba(0,0,0,.25)}
+
+  .screen{position:relative;min-height:360px;height:calc(58vh);display:flex;flex-direction:column}
+  .stage{position:relative;flex:1;display:grid;place-items:center;overflow:hidden;border-bottom:1px solid var(--edge)}
+  .controls{display:flex;gap:.5rem;flex-wrap:wrap;padding:.5rem}
+  .controls .label{font-size:.8rem;color:var(--muted);margin-right:.3rem}
+  .drop{position:absolute;inset:0;border:2px dashed rgba(108,245,255,.35);border-radius:14px;display:none;place-items:center;color:var(--muted);background:rgba(108,245,255,.06)}
+  .stage.drag .drop{display:grid}
+  .stage video,.stage audio{width:100%;height:100%;object-fit:contain;background:#060a14}
+  .overlayMsg{position:absolute;bottom:10px;left:10px;background:rgba(0,0,0,.4);border:1px solid var(--edge);padding:.35rem .5rem;border-radius:10px;font-size:.8rem;color:var(--muted)}
+
+  .mall{position:relative;display:flex;flex-direction:column;height:calc(58vh)}
+  .mall-head{display:flex;align-items:center;justify-content:space-between;padding:.55rem .7rem;border-bottom:1px solid var(--edge)}
+  .mall-title{font-size:.95rem;color:var(--muted)}
+  .mall-grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:.55rem;padding:.55rem}
+  .tile{display:flex;flex-direction:column;gap:.4rem;padding:.55rem;border:1px solid var(--edge);background:var(--glass);border-radius:12px}
+  .tile .name{font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile .meta{font-size:.72rem;color:var(--muted)}
+  .tile .row{display:flex;gap:.4rem}
+  .tile button{flex:1}
+
+  /* Flow panel */
+  .flow{position:relative;height:calc(42vh)}
+  svg{width:100%;height:100%}
+  .node rect{fill:url(#nodeGrad);stroke:var(--edge);stroke-width:1.2}
+  .node .t{font-size:12px}
+  .edge{fill:none;stroke:#7ca6ff;stroke-opacity:.75}
+  .edgeL{stroke:var(--l)}
+  .edgeR{stroke:var(--r)}
+  .edgeBoth{stroke:var(--both)}
+  .edge-bg{stroke:rgba(255,255,255,.07);stroke-width:9;fill:none}
+  .edge-arrow{fill:#7ca6ff}
+  .pulse{animation:pulse 1.2s ease-out 1}
+  @keyframes pulse{0%{filter:drop-shadow(0 0 0 rgba(108,245,255,0));}50%{filter:drop-shadow(0 0 12px rgba(108,245,255,.7));}100%{filter:drop-shadow(0 0 0 rgba(108,245,255,0));}}
+
+  .pane{display:flex;flex-direction:column;height:calc(42vh)}
+  .json{white-space:pre-wrap;font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;font-size:.78rem;background:#0b1222;color:#d9e7ff;padding:.6rem;margin:.55rem;border-radius:12px;border:1px solid var(--edge);flex:1;overflow:auto}
+  .log{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;font-size:.82rem;background:#0b1222;color:#cfe2ff;padding:.6rem;margin:.55rem;border-radius:12px;border:1px solid var(--edge);height:calc(42vh - 1.5rem);overflow:auto}
+
+  .tutor{position:fixed;inset:auto 12px 12px 12px;display:none;grid-template-columns:1fr auto;gap:.5rem;align-items:center;background:var(--glass);border:1px solid var(--edge);border-radius:12px;padding:.6rem .8rem;z-index:20}
+  .tutor.on{display:grid}
+  .tutor .text{font-size:.9rem;color:var(--ink)}
+  .tutor .sub{font-size:.8rem;color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="hud">
+    <h1>Media Mall — Split‑Screen + Protocol Flow</h1>
+    <div class="pill"><label>Offline mode</label><input id="offline" type="checkbox" checked/></div>
+    <div class="pill"><label>Allow online fallback</label><input id="allowOnline" type="checkbox" checked/></div>
+    <div class="pill"><label>Cache level</label>
+      <select id="cacheLevel"><option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option><option value="none" selected>None</option></select>
+    </div>
+    <div class="pill"><label>Speed</label><input id="speed" type="range" min="0.4" max="2.2" step="0.1" value="1"/></div>
+    <div class="pill"><label>Tutor mode</label><input id="tutor" type="checkbox"/></div>
+    <button id="loadL">Load Left</button>
+    <button id="loadR">Load Right</button>
+    <button id="playBoth">▶ Play Both</button>
+    <button id="runFlow">Run Flow</button>
+    <button id="reset">↺ Reset</button>
+    <input id="fileL" type="file" accept="video/*,audio/*" hidden/>
+    <input id="fileR" type="file" accept="video/*,audio/*" hidden/>
+    <input id="fileMall" type="file" accept="video/*,audio/*,image/*" hidden multiple/>
+  </div>
+
+  <div class="grid">
+    <!-- Left Screen -->
+    <section class="card screen" id="left">
+      <div class="stage" data-side="L">
+        <video id="vidL" controls></video>
+        <div class="drop">Drop media here (Left)</div>
+        <div class="overlayMsg" id="msgL">Left: idle</div>
+      </div>
+      <div class="controls">
+        <span class="label">Left Controls:</span>
+        <button data-act="open" data-side="L">Open</button>
+        <button data-act="play" data-side="L">Play</button>
+        <button data-act="pause" data-side="L">Pause</button>
+        <label class="label">Rate</label><input data-act="rate" data-side="L" type="range" min="0.5" max="2" step="0.1" value="1"/>
+        <label class="label">Vol</label><input data-act="vol" data-side="L" type="range" min="0" max="1" step="0.05" value="1"/>
+        <label class="label">Loop</label><input data-act="loop" data-side="L" type="checkbox"/>
+        <label class="label">Mute</label><input data-act="mute" data-side="L" type="checkbox"/>
+      </div>
+    </section>
+
+    <!-- Right Screen -->
+    <section class="card screen" id="right">
+      <div class="stage" data-side="R">
+        <video id="vidR" controls></video>
+        <div class="drop">Drop media here (Right)</div>
+        <div class="overlayMsg" id="msgR">Right: idle</div>
+      </div>
+      <div class="controls">
+        <span class="label">Right Controls:</span>
+        <button data-act="open" data-side="R">Open</button>
+        <button data-act="play" data-side="R">Play</button>
+        <button data-act="pause" data-side="R">Pause</button>
+        <label class="label">Rate</label><input data-act="rate" data-side="R" type="range" min="0.5" max="2" step="0.1" value="1"/>
+        <label class="label">Vol</label><input data-act="vol" data-side="R" type="range" min="0" max="1" step="0.05" value="1"/>
+        <label class="label">Loop</label><input data-act="loop" data-side="R" type="checkbox"/>
+        <label class="label">Mute</label><input data-act="mute" data-side="R" type="checkbox"/>
+      </div>
+    </section>
+
+    <!-- Mall + Flow/Logs Sidebar -->
+    <aside>
+      <section class="card mall">
+        <div class="mall-head">
+          <div class="mall-title">Mall Inventory (local picks)</div>
+          <div>
+            <button id="addMall">+ Add Media</button>
+          </div>
+        </div>
+        <div class="mall-grid" id="mallGrid"></div>
+      </section>
+
+      <section class="card flow" id="flowCard">
+        <svg id="flowSvg" viewBox="0 0 560 260" aria-label="Protocol Flow">
+          <defs>
+            <linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#0e1b37"/>
+              <stop offset="100%" stop-color="#0a1224"/>
+            </linearGradient>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" class="edge-arrow"/></marker>
+          </defs>
+          <g id="gNodes"></g>
+          <g id="gEdgesBG"></g>
+          <g id="gEdges"></g>
+        </svg>
+      </section>
+
+      <section class="card pane">
+        <div class="json" id="payload">{}</div>
+      </section>
+
+      <section class="card pane">
+        <div class="log" id="log"></div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="tutor" id="tutorBox">
+    <div>
+      <div class="text" id="tutorText">Tutor Mode: off</div>
+      <div class="sub" id="tutorSub">Toggle Tutor Mode to get step‑by‑step guidance as flows run.</div>
+    </div>
+    <div>
+      <button id="tutorNext">Next ▶</button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const $ = sel=>document.querySelector(sel);
+  const $$ = sel=>document.querySelectorAll(sel);
+  const logEl = $('#log');
+  const payloadEl = $('#payload');
+  const mallGrid = $('#mallGrid');
+  const inputs = { L: $('#fileL'), R: $('#fileR'), mall: $('#fileMall') };
+  const vids = { L: $('#vidL'), R: $('#vidR') };
+  const msgs = { L: $('#msgL'), R: $('#msgR') };
+  const stages = { L: $('#left .stage'), R: $('#right .stage') };
+  const controls = {
+    offline: $('#offline'), allowOnline: $('#allowOnline'), cacheLevel: $('#cacheLevel'), speed: $('#speed'), tutor: $('#tutor')
+  };
+  const tutorBox = $('#tutorBox');
+  const tutorText = $('#tutorText');
+  const tutorSub = $('#tutorSub');
+
+  // Simple in-memory cache registry (simulated Snake Eyes)
+  const cache = new Map(); // key -> { level, url, type }
+  const mall = []; // {name, size, type, url}
+
+  function kb(n){ return (n/1024).toFixed(1)+' KB'; }
+  function log(msg, type){
+    const t = new Date().toLocaleTimeString();
+    const color = type==='warn'? '#ffd36c' : type==='err'? '#ff7e9e' : '#a7ffcf';
+    const line = document.createElement('div');
+    line.innerHTML = `<span style="color:${color}">[${t}]</span> ${msg}`;
+    logEl.appendChild(line); logEl.scrollTop = logEl.scrollHeight;
+  }
+  function setMsg(side, text){ msgs[side].textContent = text; }
+
+  // Mall UI
+  function addToMall(file){
+    const url = URL.createObjectURL(file);
+    const item = { name:file.name, size:file.size, type:file.type, url };
+    mall.push(item);
+    renderMall();
+  }
+  function renderMall(){
+    mallGrid.innerHTML = '';
+    for(const item of mall){
+      const el = document.createElement('div'); el.className='tile';
+      el.innerHTML = `<div class="name" title="${item.name}">${item.name}</div>
+                      <div class="meta">${item.type || 'unknown'} • ${kb(item.size)}</div>
+                      <div class="row">
+                        <button data-asn="L">To Left</button>
+                        <button data-asn="R">To Right</button>
+                      </div>`;
+      el.querySelector('[data-asn="L"]').onclick = ()=> loadInto('L', item);
+      el.querySelector('[data-asn="R"]').onclick = ()=> loadInto('R', item);
+      mallGrid.appendChild(el);
+    }
+  }
+
+  // File inputs
+  $('#addMall').addEventListener('click', ()=> inputs.mall.click());
+  inputs.mall.addEventListener('change', (e)=>{
+    for(const f of e.target.files) addToMall(f);
+    e.target.value = '';
+  });
+
+  $('#loadL').addEventListener('click', ()=> inputs.L.click());
+  $('#loadR').addEventListener('click', ()=> inputs.R.click());
+  inputs.L.addEventListener('change', e=> handlePick('L', e.target.files[0]));
+  inputs.R.addEventListener('change', e=> handlePick('R', e.target.files[0]));
+
+  function handlePick(side, file){ if(!file) return; const url = URL.createObjectURL(file); loadInto(side, {name:file.name,size:file.size,type:file.type,url}); }
+
+  // Drag & drop
+  for(const s of ['L','R']){
+    const stage = stages[s];
+    stage.addEventListener('dragover', e=>{ e.preventDefault(); stage.classList.add('drag'); });
+    stage.addEventListener('dragleave', ()=> stage.classList.remove('drag'));
+    stage.addEventListener('drop', e=>{
+      e.preventDefault(); stage.classList.remove('drag'); const f = e.dataTransfer.files?.[0]; if(f) handlePick(s,f);
+    });
+  }
+
+  // Load into a side
+  function loadInto(side, item){
+    const v = vids[side];
+    // audio vs video
+    const isAudio = (item.type||'').startsWith('audio/');
+    // swap element if needed
+    if(isAudio && v.tagName.toLowerCase()!=='audio'){
+      const a = document.createElement('audio'); a.controls = true; a.id = v.id; v.replaceWith(a); vids[side] = a;
+    } else if(!isAudio && v.tagName.toLowerCase()!=='video'){
+      const nv = document.createElement('video'); nv.controls = true; nv.id = v.id; vids[side] = nv; stages[side].querySelector('audio')?.replaceWith(nv);
+    }
+
+    vids[side].src = item.url; vids[side].playbackRate = 1; vids[side].volume = 1; vids[side].loop = false; vids[side].muted = false;
+    setMsg(side, `${side}: loaded ${item.name}`);
+
+    // mark cache level
+    cache.set(item.url, { level: controls.cacheLevel.value==='none'?'hot':controls.cacheLevel.value, url:item.url, type:item.type });
+
+    // build + show payload
+    const payload = buildPayload(side, item);
+    payloadEl.textContent = JSON.stringify(payload, null, 2);
+
+    // run flow for this side
+    runFlowFor(side, item);
+  }
+
+  function buildPayload(side, item){
+    return {
+      protocol: 'POPS-PanelSync-1.0',
+      priority: 'offline-first',
+      request: { source:'User', command:'loadMedia', screen: side, file: item.name, type: item.type||'unknown' },
+      cache_strategy: { level: cache.get(item.url)?.level || 'none', fallback_online: controls.allowOnline.checked },
+      stream_mode: 'split-screen',
+      sync: { enabled: true, method: 'delta' },
+      feedback: { message: 'Media ready', panel_update: true, save_state: true }
+    };
+  }
+
+  // Controls on each side
+  for(const el of $$('.controls [data-act]')){
+    el.addEventListener('change', handleControl);
+    el.addEventListener('click', handleControl);
+  }
+  function handleControl(e){
+    const act = e.currentTarget.getAttribute('data-act');
+    const side = e.currentTarget.getAttribute('data-side');
+    const v = vids[side]; if(!v) return;
+    switch(act){
+      case 'open': (side==='L'?inputs.L:inputs.R).click(); break;
+      case 'play': v.play?.(); break;
+      case 'pause': v.pause?.(); break;
+      case 'rate': v.playbackRate = parseFloat(e.currentTarget.value||'1'); break;
+      case 'vol': v.volume = parseFloat(e.currentTarget.value||'1'); break;
+      case 'loop': v.loop = e.currentTarget.checked; break;
+      case 'mute': v.muted = e.currentTarget.checked; break;
+    }
+  }
+
+  // Play both
+  $('#playBoth').addEventListener('click', ()=>{ vids.L?.play?.(); vids.R?.play?.(); });
+
+  // Flow visualization (mini graph)
+  const flowSvg = $('#flowSvg');
+  const gN = $('#gNodes'), gEBG = $('#gEdgesBG'), gE = $('#gEdges');
+  const nodes = [
+    n('user', 40, 30, 90, 40, 'User'),
+    n('roger', 150, 30, 100, 40, 'Roger'),
+    n('cache', 150, 100, 120, 46, 'Cache'),
+    n('online', 280, 100, 120, 46, 'Online'),
+    n('engine', 280, 170, 120, 46, 'Engine'),
+    n('panel', 410, 170, 120, 46, 'Panel'),
+    n('state', 410, 100, 120, 46, 'State')
+  ];
+  const nodeMap = new Map(nodes.map(x=>[x.id,x]));
+  const edges = [
+    e('user','roger'), e('roger','cache'), e('roger','online'), e('cache','engine'), e('online','engine'), e('engine','panel'), e('panel','state'), e('state','online')
+  ];
+  drawFlow();
+
+  function n(id,x,y,w,h,label){ return {id,x,y,w,h,label}; }
+  function e(a,b){ return {id:`${a}_${b}`,a,b}; }
+  function drawFlow(){
+    gN.innerHTML=''; gEBG.innerHTML=''; gE.innerHTML='';
+    for(const nd of nodes){
+      const g = svgGroup('node');
+      const r = svgRect(nd.x,nd.y,nd.w,nd.h,10); g.appendChild(r);
+      const t = svgText(nd.x+nd.w/2, nd.y+nd.h/2+4, nd.label,'middle'); t.setAttribute('class','t'); g.appendChild(t);
+      gN.appendChild(g);
+    }
+    for(const ed of edges){
+      const p = pathFor(ed.a, ed.b);
+      const bg = svgPath(p,'edge-bg'); gEBG.appendChild(bg);
+      const fg = svgPath(p,'edge'); fg.setAttribute('marker-end','url(#arrow)'); fg.dataset.id = ed.id; gE.appendChild(fg);
+    }
+  }
+  function center(nd){ return {cx: nd.x+nd.w/2, cy: nd.y+nd.h/2}; }
+  function pathFor(a,b){ const A=center(nodeMap.get(a)), B=center(nodeMap.get(b)); const midX=(A.cx+B.cx)/2; return `M ${A.cx} ${A.cy} C ${midX} ${A.cy}, ${midX} ${B.cy}, ${B.cx} ${B.cy}`; }
+  function svgRect(x,y,w,h,rx){ const el=document.createElementNS('http://www.w3.org/2000/svg','rect'); el.setAttribute('x',x); el.setAttribute('y',y); el.setAttribute('width',w); el.setAttribute('height',h); el.setAttribute('rx',rx); return el; }
+  function svgText(x,y,txt,anchor){ const el=document.createElementNS('http://www.w3.org/2000/svg','text'); el.setAttribute('x',x); el.setAttribute('y',y); el.setAttribute('text-anchor',anchor||'start'); el.textContent=txt; return el; }
+  function svgPath(d,cls){ const el=document.createElementNS('http://www.w3.org/2000/svg','path'); el.setAttribute('d',d); el.setAttribute('class',cls); return el; }
+
+  // Animate a flow for Left/Right/Both
+  async function runFlowFor(side, item){
+    const opts = { offline: controls.offline.checked, allowOnline: controls.allowOnline.checked, level: cache.get(item.url)?.level||'none', speed: parseFloat(controls.speed.value||'1') };
+    const edgeIds = computeFlow(opts);
+    await animateEdges(edgeIds, side, opts.speed);
+    log(`[${side}] Flow complete for ${item.name}`);
+    tutorStep(4, `[${side}] Panel active. State saved. Delta sync ${opts.offline? 'queued' : 'pushed'}.`);
+  }
+
+  function computeFlow(opts){
+    const path = ['user_roger'];
+    if(opts.offline){
+      path.push('roger_cache');
+      if(opts.level!=='none'){
+        path.push('cache_engine','engine_panel','panel_state');
+      } else if(opts.allowOnline){
+        path.push('roger_online','online_engine','engine_panel','panel_state','state_online');
+      } else {
+        // partial
+      }
+    } else {
+      if(opts.level!=='none') path.push('roger_cache','cache_engine','engine_panel','panel_state','state_online');
+      else path.push('roger_online','online_engine','engine_panel','panel_state','state_online');
+    }
+    return path;
+  }
+
+  async function animateEdges(ids, side, speed){
+    const cls = side==='L' ? 'edgeL' : side==='R' ? 'edgeR' : 'edgeBoth';
+    for(const id of ids){ const p = gE.querySelector(`[data-id="${id}"]`); if(!p) continue; await strokeDash(p, cls, speed); }
+  }
+  function strokeDash(pathEl, cls, speed){
+    return new Promise(res=>{
+      const L = pathEl.getTotalLength();
+      pathEl.classList.add(cls);
+      pathEl.style.strokeDasharray = L;
+      pathEl.style.strokeDashoffset = L;
+      pathEl.style.transition = 'none';
+      // kick
+      requestAnimationFrame(()=>{
+        pathEl.style.transition = `stroke-dashoffset ${Math.max(300,L)}ms linear`;
+        pathEl.style.strokeDashoffset = '0';
+        setTimeout(()=>{ pathEl.style.transition=''; pathEl.style.strokeDasharray=''; pathEl.style.strokeDashoffset=''; res(); }, Math.max(360, L/1.1)/speed);
+      });
+    });
+  }
+
+  // Public buttons
+  $('#runFlow').addEventListener('click', async ()=>{
+    // Run with whatever is currently loaded
+    const leftItem = vids.L?.src && cache.get(vids.L.src) ? {name:'Left media', url: vids.L.src} : null;
+    const rightItem = vids.R?.src && cache.get(vids.R.src) ? {name:'Right media', url: vids.R.src} : null;
+    const opts = { offline: controls.offline.checked, allowOnline: controls.allowOnline.checked, level: controls.cacheLevel.value, speed: parseFloat(controls.speed.value||'1') };
+    const ids = computeFlow(opts);
+    log('Running Both flow (visual only).'); tutorStep(1, 'User → Roger: command parsed.');
+    await animateEdges(ids, 'Both', opts.speed);
+    tutorStep(4, 'Panels active (visualization).');
+  });
+
+  $('#reset').addEventListener('click', ()=>{ drawFlow(); log('Reset flow view.'); });
+
+  // Tutor mode
+  controls.tutor.addEventListener('change', ()=>{ tutorBox.classList.toggle('on', controls.tutor.checked); if(controls.tutor.checked){ tutorText.textContent='Step 1: User → Roger'; tutorSub.textContent='Issue a command (open/play). Roger parses intent and builds a request.'; } });
+  let tutorIdx = 1; $('#tutorNext').addEventListener('click', ()=>{ tutorIdx=(tutorIdx%4)+1; switch(tutorIdx){ case 1: tutorText.textContent='Step 1: User → Roger'; tutorSub.textContent='Commands, gestures, or voice → structured request.'; break; case 2: tutorText.textContent='Step 2: Cache vs Online'; tutorSub.textContent='Offline‑first: try Snake Eyes (Hot/Warm/Cold). Else fallback to Online (if allowed).'; break; case 3: tutorText.textContent='Step 3: Engine → Panel'; tutorSub.textContent='Engine loads media/AppDrop; Panel renders split‑screen.'; break; case 4: tutorText.textContent='Step 4: State → Online'; tutorSub.textContent='State saved locally; deltas synced when/if online.'; break; } });
+  function tutorStep(idx, extra){ if(!controls.tutor.checked) return; tutorIdx = idx; $('#tutorText').textContent = `Step ${idx}`; $('#tutorSub').textContent = extra || ''; }
+
+})();
+</script>
+</body>
+</html>
