@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>P.O.P.S. Media Mall — Split‑Screen Protocol AppDrop</title>
+<style>
+  :root{
+    --bg:#0a0f1a; --panel:#0e1526; --ink:#e7ebff; --muted:#9da9d9; --edge:#1f2947;
+    --accent:#6cf5ff; --accent2:#c28bff; --good:#67ffa1; --warn:#ffd36c; --danger:#ff7e9e;
+    --l:#67ffa1; --r:#6cf5ff; --both:#c28bff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(1200px 680px at 20% -10%, #0f1629, var(--bg));color:var(--ink);font-family:Inter, system-ui, sans-serif}
+  svg{width:100%;height:100%}
+
+  /* Cinematic glow */
+  .edgePulse { stroke-dasharray: 12 10; animation: flowPulse 1.2s linear infinite; }
+  .edgeL.edgePulse { stroke: var(--l); }
+  .edgeR.edgePulse { stroke: var(--r); }
+  .edgeBoth.edgePulse { stroke: var(--both); }
+  @keyframes flowPulse { to { stroke-dashoffset: -24; } }
+
+  .nodeGlow rect { stroke-width: 2.5; filter: url(#nodeGlowFx); }
+  .node-active rect { stroke: var(--accent); filter: drop-shadow(0 0 10px rgba(108,245,255,.45)); }
+
+  /* Status text inside nodes */
+  .node-status { font-size: 10px; fill: #9da9d9; }
+  /* Cinematic add‑ons (appended safely) */
+  .edge.flowing{stroke-dasharray:12 10;animation:march 0.9s linear infinite}
+  @keyframes march{to{stroke-dashoffset:-22}}
+  .node-active rect{stroke:var(--accent);filter:drop-shadow(0 0 10px rgba(108,245,255,.45))}
+  .node-status{font-size:10px; fill:#9da9d9}
+</style>
+</head>
+<body>
+  <div style="padding:.5rem;background:#0e1526;border-bottom:1px solid var(--edge);display:flex;gap:.5rem;align-items:center;">
+    <h1 style="font-size:1rem;color:var(--accent);margin:0;">Media Mall — Cinematic Run Flow</h1>
+    <button id="runFlow" style="padding:.45rem .8rem;border:1px solid var(--edge);border-radius:8px;background:#0f1a33;color:var(--ink);cursor:pointer" title="Run Flow — you’ll see animated arrows trace the exact pipeline.">▶ Run Flow</button>
+    <button id="reset" style="padding:.45rem .8rem;border:1px solid var(--edge);border-radius:8px;background:#0f1a33;color:var(--ink);cursor:pointer">↺ Reset</button>
+  </div>
+
+  <svg id="flowSvg" viewBox="0 0 560 260" aria-label="Protocol Flow">
+    <defs>
+      <linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#0e1b37"/>
+        <stop offset="100%" stop-color="#0a1224"/>
+      </linearGradient>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" class="edge-arrow"/>
+      </marker>
+      <filter id="nodeGlowFx" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+        <feMerge>
+          <feMergeNode in="coloredBlur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+    <g id="gEdgesBG"></g>
+    <g id="gEdges"></g>
+    <g id="gNodes"></g>
+  </svg>
+
+<script>
+(function(){
+  const gNodes = document.querySelector('#gNodes');
+  const gEdges = document.querySelector('#gEdges');
+  const gEdgesBG = document.querySelector('#gEdgesBG');
+
+  const nodes = [
+    n('user', 40, 30, 90, 40, 'User'),
+    n('roger', 150, 30, 100, 40, 'Roger'),
+    n('cache', 150, 100, 120, 46, 'Cache'),
+    n('online', 280, 100, 120, 46, 'Online'),
+    n('engine', 280, 170, 120, 46, 'Engine'),
+    n('panel', 410, 170, 120, 46, 'Panel'),
+    n('state', 410, 100, 120, 46, 'State')
+  ];
+  const nodeMap = new Map(nodes.map(x=>[x.id,x]));
+
+  const edges = [
+    e('user','roger'), e('roger','cache'), e('roger','online'), e('cache','engine'),
+    e('online','engine'), e('engine','panel'), e('panel','state'), e('state','online')
+  ];
+
+  drawFlow();
+
+  function n(id,x,y,w,h,label){ return {id,x,y,w,h,label}; }
+  function e(a,b){ return {id:`${a}_${b}`,a,b}; }
+
+  function drawFlow(){
+    gNodes.innerHTML=''; gEdges.innerHTML=''; gEdgesBG.innerHTML='';
+    for(const nd of nodes){
+      const g = svgGroup('nodeGlow');
+      g.dataset.id = nd.id;
+      const r = svgRect(nd.x,nd.y,nd.w,nd.h,10); g.appendChild(r);
+      const t = svgText(nd.x+nd.w/2, nd.y+nd.h/2-2, nd.label,'middle'); t.style.fontSize = '12px'; g.appendChild(t);
+      const s = svgText(nd.x+nd.w/2, nd.y+nd.h-6, 'idle','middle'); s.setAttribute('class','node-status'); g.appendChild(s);
+      gNodes.appendChild(g);
+    }
+    for(const ed of edges){
+      const p = pathFor(ed.a, ed.b);
+      const bg = svgPath(p,'edge-bg'); gEdgesBG.appendChild(bg);
+      const fg = svgPath(p,'edge'); fg.setAttribute('marker-end','url(#arrow)'); fg.dataset.id = ed.id; gEdges.appendChild(fg);
+    }
+  }
+
+  function center(nd){ return {cx: nd.x+nd.w/2, cy: nd.y+nd.h/2}; }
+  function pathFor(a,b){ const A=center(nodeMap.get(a)), B=center(nodeMap.get(b)); const midX=(A.cx+B.cx)/2; return `M ${A.cx} ${A.cy} C ${midX} ${A.cy}, ${midX} ${B.cy}, ${B.cx} ${B.cy}`; }
+  function svgRect(x,y,w,h,rx){ const el=document.createElementNS('http://www.w3.org/2000/svg','rect'); el.setAttribute('x',x); el.setAttribute('y',y); el.setAttribute('width',w); el.setAttribute('height',h); el.setAttribute('rx',rx); return el; }
+  function svgText(x,y,txt,anchor){ const el=document.createElementNS('http://www.w3.org/2000/svg','text'); el.setAttribute('x',x); el.setAttribute('y',y); el.setAttribute('text-anchor',anchor||'start'); el.textContent=txt; return el; }
+  function svgPath(d,cls){ const el=document.createElementNS('http://www.w3.org/2000/svg','path'); el.setAttribute('d',d); if(cls) el.setAttribute('class',cls); return el; }
+  function svgGroup(cls){ const el=document.createElementNS('http://www.w3.org/2000/svg','g'); if(cls) el.setAttribute('class',cls); return el; }
+
+  function setNodeStatus(id, text){
+    const status = gNodes.querySelector(`[data-id="${id}"] .node-status`);
+    if(status) status.textContent = text;
+    const group = gNodes.querySelector(`[data-id="${id}"]`);
+    if(group){ group.classList.add('node-active'); setTimeout(()=>group.classList.remove('node-active'),900); }
+  }
+
+  async function animateFlow(){
+    resetFlow();
+    for(const ed of edges){
+      const parts = ed.id.split('_');
+      const fg = gEdges.querySelector(`[data-id="${ed.id}"]`);
+      if(!fg) continue;
+
+      setNodeStatus(parts[0], 'sending…');
+      fg.classList.add('edgePulse','edgeBoth');
+      await sleep(500);
+      setNodeStatus(parts[1], 'received');
+
+      setTimeout(()=>fg.classList.remove('edgePulse','edgeBoth'), 700);
+    }
+  }
+
+  function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+  function resetFlow(){
+    gEdges.querySelectorAll('path').forEach(p=>p.classList.remove('edgePulse','edgeBoth'));
+    gNodes.querySelectorAll('.node-active').forEach(n=>n.classList.remove('node-active'));
+    gNodes.querySelectorAll('.node-status').forEach(n=>n.textContent='idle');
+  }
+
+  document.getElementById('runFlow').addEventListener('click', animateFlow);
+  document.getElementById('reset').addEventListener('click', resetFlow);
+})();
+</script>
+<script>
+// --- Cinematic Run Flow upgrade (appended safely) ---
+(function(){
+  const gNodes = document.getElementById('gNodes');
+  const gEdges = document.getElementById('gEdges');
+  const runBtn = document.getElementById('runFlow');
+  const resetBtn = document.getElementById('reset');
+
+  // Ensure each node has a status line under the label
+  function ensureStatuses(){
+    const groups = Array.from(gNodes.querySelectorAll('g'));
+    for(const g of groups){
+      if(!g.querySelector('text[data-role="status"]')){
+        const r = g.querySelector('rect');
+        if(!r) continue;
+        const x = parseFloat(r.getAttribute('x')) + parseFloat(r.getAttribute('width'))/2;
+        const y = parseFloat(r.getAttribute('y')) + parseFloat(r.getAttribute('height')) - 6;
+        const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('x', x);
+        t.setAttribute('y', y);
+        t.setAttribute('text-anchor','middle');
+        t.setAttribute('class','node-status');
+        t.setAttribute('data-role','status');
+        t.textContent = 'idle';
+        g.appendChild(t);
+      }
+    }
+  }
+
+  function setNodeStatus(id, text){
+    const group = gNodes.querySelector(`g[data-id="${id}"]`);
+    if(!group) return;
+    const status = group.querySelector('text[data-role="status"]');
+    if(status) status.textContent = text;
+    group.classList.add('node-active');
+    setTimeout(()=>group.classList.remove('node-active'), 900);
+  }
+
+  function resetFlow(){
+    gEdges.querySelectorAll('path').forEach(p=>{
+      p.classList.remove('edgePulse','edgeBoth','edgeL','edgeR','flowing');
+      p.style.strokeDasharray=''; p.style.strokeDashoffset=''; p.style.transition='';
+    });
+    gNodes.querySelectorAll('g').forEach(n=>{
+      const s=n.querySelector('text[data-role="status"]'); if(s) s.textContent='idle';
+      n.classList.remove('node-active');
+    });
+  }
+
+  function strokeDraw(pathEl, speed){
+    return new Promise(res=>{
+      const L = pathEl.getTotalLength();
+      pathEl.style.strokeDasharray = L;
+      pathEl.style.strokeDashoffset = L;
+      pathEl.style.transition = 'none';
+      requestAnimationFrame(()=>{
+        pathEl.style.transition = `stroke-dashoffset ${Math.max(300,L)}ms linear`;
+        pathEl.style.strokeDashoffset = '0';
+        setTimeout(()=>{
+          pathEl.style.transition='';
+          pathEl.style.strokeDasharray='';
+          pathEl.style.strokeDashoffset='';
+          res();
+        }, Math.max(360, L/1.1) / (speed||1));
+      });
+    });
+  }
+
+  async function cinematicFlow(){
+    ensureStatuses();
+    resetFlow();
+    const paths = Array.from(gEdges.querySelectorAll('path[data-id]'));
+    for(const p of paths){
+      const id = p.getAttribute('data-id');
+      const [from,to] = id.split('_');
+      setNodeStatus(from, 'sending…');
+      p.classList.add('edgePulse','edgeBoth','flowing');
+      await strokeDraw(p, 1);
+      p.classList.remove('flowing');
+      setNodeStatus(to, 'received');
+      await new Promise(r=>setTimeout(r,120));
+    }
+  }
+
+  // Replace old Run Flow listener with cinematic one (without knowing original code)
+  if(runBtn){
+    const clone = runBtn.cloneNode(true);
+    runBtn.parentNode.replaceChild(clone, runBtn);
+    clone.addEventListener('click', cinematicFlow);
+  }
+  if(resetBtn){
+    const cloneR = resetBtn.cloneNode(true);
+    resetBtn.parentNode.replaceChild(cloneR, resetBtn);
+    cloneR.addEventListener('click', resetFlow);
+  }
+
+})();
+</script>
+</body>
+</html>
